@@ -301,7 +301,7 @@ with st.sidebar:
     difficulty = st.selectbox("", ["Easy", "Medium", "Hard"], index=1, label_visibility="collapsed")
     
     st.markdown('<p style="color: #a0aec0; font-weight: 600; margin-top: 15px;">Number of Questions</p>', unsafe_allow_html=True)
-    num_questions = st.number_input("", min_value=1, max_value=30, value=5, label_visibility="collapsed")
+    num_questions = st.number_input("", min_value=1, max_value=30, value=30, label_visibility="collapsed")
     
     # Generate quiz button
     st.markdown('<div style="margin-top: 25px;"></div>', unsafe_allow_html=True)
