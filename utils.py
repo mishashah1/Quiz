@@ -55,32 +55,66 @@ class QuizManager:
         quiz_str = f"{topic}_{question_type}_{difficulty}_{timestamp}"
         return hashlib.md5(quiz_str.encode()).hexdigest()[:8]
 
-    def load_excel_questions(self, module, difficulty, num_questions):
-        """Load questions from Excel files based on module and difficulty"""
-        excel_files = {
+    def load_QuanBank_questions(self, module, difficulty, num_questions):
+        """Load questions from QuanBank files based on module and difficulty"""
+        QuanBank_files = {
             '1': 'T1.xlsx', '2': 'T1.xlsx', '3': 'T1.xlsx',
             '4': 'T2.xlsx', '5': 'T2.xlsx'
         }
-        file_path = excel_files.get(module)
+        file_path = QuanBank_files.get(module)
         if not file_path or not os.path.exists(file_path):
-            st.error(f"Excel file for module {module} not found.")
+            st.error(f"QuanBank file for module {module} not found.")
             return [], False
 
         try:
             df = pd.read_excel(file_path)
-            # Map difficulty levels
-            difficulty_map = {'Easy': 'B', 'Medium': 'I', 'Hard': 'E'}
-            target_difficulty = difficulty_map.get(difficulty, 'I')
-            
-            # Filter questions by module and difficulty
-            filtered_df = df[(df['MODULE'] == int(module)) & (df['DIFFICULTY LEVEL'] == target_difficulty)]
-            
-            if filtered_df.empty or len(filtered_df) < num_questions:
-                st.warning(f"Insufficient questions found for Module {module} and difficulty {difficulty}. Required: {num_questions}, Found: {len(filtered_df)}. Defaulting to LLM with Python questions.")
+
+            # Define full difficulty order
+            difficulty_order = ['B', 'I', 'E']
+            difficulty_index_map = {'Easy': 0, 'Medium': 1, 'Hard': 2}
+
+            # Get difficulty level index
+            selected_index = difficulty_index_map.get(difficulty, 1)
+
+            # Define fallback logic per difficulty
+            if difficulty == 'Easy':
+                fallback_levels = ['B', 'I', 'E']  # Go up if needed
+            elif difficulty == 'Medium':
+                fallback_levels = ['I', 'B', 'E']       # Try I, then fallback to B → E
+            elif difficulty == 'Hard':
+                fallback_levels = ['E', 'I', 'B']  # Try E, fallback down to I → B
+            else:
+                fallback_levels = ['I', 'B', 'E']       # Default to Medium fallback
+
+            # Filter by module
+            module_df = df[df['MODULE'] == int(module)]
+
+            # Select questions in fallback order
+            selected_questions = pd.DataFrame()
+
+            for level in fallback_levels:
+                available = module_df[module_df['DIFFICULTY LEVEL'] == level]
+                n_needed = num_questions - len(selected_questions)
+                if n_needed <= 0:
+                    break
+                if not available.empty:
+                    selected_questions = pd.concat([
+                        selected_questions,
+                        available.sample(min(n_needed, len(available)))
+                    ], ignore_index=True)
+
+            # Check if enough were collected
+            if selected_questions.empty or len(selected_questions) < num_questions:
+                st.warning(
+                    f"Insufficient questions for Module {module} and difficulty {difficulty}. "
+                    f"Required: {num_questions}, Found: {len(selected_questions)}."
+                )
                 return [], False
-            
-            # Sample questions
-            sampled_questions = filtered_df.sample(n=num_questions, random_state=42)
+
+            # Final sample (in case of overfill)
+            sampled_questions = selected_questions.sample(n=num_questions)
+
+
             
             questions = []
             for _, row in sampled_questions.iterrows():
@@ -96,28 +130,28 @@ class QuizManager:
                 })
             return questions, True
         except Exception as e:
-            st.error(f"Error reading Excel file: {e}")
+            st.error(f"Error reading QuanBank file: {e}")
             return [], False
 
-    def generate_questions(self, generator, topic, question_type, difficulty, num_questions, source='LLM', module=None):
+    def generate_questions(self, generator, topic, question_type, difficulty, num_questions, source='AutoGen', module=None):
         self.reset_state()
         self.current_topic = topic
         self.current_difficulty = difficulty
         self.current_quiz_id = self.generate_quiz_id(topic, question_type, difficulty)
         
         try:
-            if source == 'Excel' and question_type == 'Multiple Choice':
-                questions, success = self.load_excel_questions(module, difficulty, num_questions)
+            if source == 'QuanBank' and question_type == 'Multiple Choice':
+                questions, success = self.load_QuanBank_questions(module, difficulty, num_questions)
                 if success:
                     self.questions = questions
                 else:
-                    # Fallback to LLM with Python topic
-                    source = 'LLM'
+                    # Fallback to AutoGen with Python topic
+                    source = 'AutoGen'
                     topic = "Python"
                     self.current_topic = topic
                     self.current_quiz_id = self.generate_quiz_id(topic, question_type, difficulty)
             
-            if source == 'LLM' or question_type != 'Multiple Choice':
+            if source == 'AutoGen' or question_type != 'Multiple Choice':
                 for _ in range(num_questions):
                     if question_type == 'Multiple Choice':
                         question = generator.generate_mcq(topic, difficulty.lower())

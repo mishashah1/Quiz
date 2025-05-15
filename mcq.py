@@ -276,34 +276,37 @@ with st.sidebar:
     
     # Source selection
     st.markdown('<p style="color: #a0aec0; font-weight: 600;">Question Source</p>', unsafe_allow_html=True)
-    source = st.selectbox("", ["LLM", "Excel"], index=0, label_visibility="collapsed")
+    source = st.selectbox("", ["QuanBank", "AutoGen"], index=0, label_visibility="collapsed")
     
-    # Module selection for Excel
+    # Module selection for QuanBank
     module = None
-    topic = "Module-Based"  # Default for Excel
-    question_type = "Multiple Choice"  # Default for Excel
-    if source == "Excel":
+    topic = "Module-Based"  # Default for QuanBank
+    question_type = "Multiple Choice"  # Default for QuanBank
+    if source == "QuanBank":
         st.markdown('<p style="color: #a0aec0; font-weight: 600; margin-top: 15px;">Module</p>', unsafe_allow_html=True)
-        module = st.selectbox("", ["1", "2", "3", "4", "5"], index=0, label_visibility="collapsed")
+        module1 = st.selectbox("", ["1. Python Programming", "2. Statistical Concepts", "3. Data Science and Analytics", "4. Machine Learning Mandatory", "5. Deep Learning"], index=0, label_visibility="collapsed")
+        module = module1.split(".")[0].strip()
         topic = f"Module {module}" if module else "Module-Based"
     else:
-        # Quiz configuration for LLM only
+        # Quiz configuration for AutoGen only
         st.markdown('<p style="color: #a0aec0; font-weight: 600; margin-top: 15px;">Question Format</p>', unsafe_allow_html=True)
         question_type = st.selectbox("", ["Multiple Choice", "Fill in the Blank"], index=0, label_visibility="collapsed")
         
         st.markdown('<p style="color: #a0aec0; font-weight: 600; margin-top: 15px;">Subject Area</p>', unsafe_allow_html=True)
-        topic = st.text_input("Enter a topic (e.g. Operating System, DBMS)", value="Operating System")
+        topic = st.text_input("Enter a topic (e.g. Operating System, DBMS)", value="")
+
     
     # Common settings
     st.markdown('<p style="color: #a0aec0; font-weight: 600; margin-top: 15px;">Difficulty Level</p>', unsafe_allow_html=True)
     difficulty = st.selectbox("", ["Easy", "Medium", "Hard"], index=1, label_visibility="collapsed")
     
     st.markdown('<p style="color: #a0aec0; font-weight: 600; margin-top: 15px;">Number of Questions</p>', unsafe_allow_html=True)
-    num_questions = st.number_input("", min_value=1, max_value=50, value=5, label_visibility="collapsed")
+    num_questions = st.number_input("", min_value=1, max_value=30, value=5, label_visibility="collapsed")
     
     # Generate quiz button
     st.markdown('<div style="margin-top: 25px;"></div>', unsafe_allow_html=True)
     generate_quiz = st.button("Generate Quiz", use_container_width=True)
+    
     
     # Sidebar footer
     st.markdown('<div class="footer" style="color: #a0aec0; margin-top: 40px;">NIELIT MCQ Generator<br>© 2025</div>', unsafe_allow_html=True)
@@ -328,13 +331,17 @@ with content_col:
     
     # Process quiz generation
     if generate_quiz:
-        with st.spinner("Creating your personalized quiz..."):
-            st.session_state.quiz_submitted = False
-            generator = QuestionGenerator()
-            st.session_state.quiz_generated = st.session_state.quiz_manager.generate_questions(
-                generator, topic, question_type, difficulty, num_questions, source, module
-            )
-            st.rerun()
+        if topic.strip() == "":
+            st.error("Please enter a topic before generating the quiz.")
+
+        else:
+            with st.spinner("Creating your personalized quiz..."):
+                st.session_state.quiz_submitted = False
+                generator = QuestionGenerator()
+                st.session_state.quiz_generated = st.session_state.quiz_manager.generate_questions(
+                    generator, topic, question_type, difficulty, num_questions, source, module
+                )
+                st.rerun()
 
     # Display quiz if generated
     if st.session_state.quiz_generated and st.session_state.quiz_manager.questions:
@@ -417,24 +424,6 @@ with content_col:
                     </div>
                     """, unsafe_allow_html=True)
             
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("Save Results", use_container_width=True):
-                    saved_file = st.session_state.quiz_manager.save_to_csv()
-                    if saved_file:
-                        st.session_state.saved_file_path = saved_file
-                        st.rerun()
-            
-            with col2:
-                if 'saved_file_path' in st.session_state and st.session_state.saved_file_path:
-                    with open(st.session_state.saved_file_path, 'rb') as f:
-                        st.download_button(
-                            label="Download Results",
-                            data=f.read(),
-                            file_name=os.path.basename(st.session_state.saved_file_path),
-                            mime='text/csv',
-                            use_container_width=True
-                        )
         else:
             st.warning("No results available. Please complete the quiz first.")
         
@@ -453,7 +442,6 @@ with content_col:
                     <li>Select your preferred settings from the sidebar</li>
                     <li>Click "Generate Quiz" to create questions</li>
                     <li>Answer the questions and submit your responses</li>
-                    <li>View your results and download them if needed</li>
                 </ol>
             </div>
         </div>
