@@ -8,8 +8,8 @@ from langchain.prompts import PromptTemplate
 from langchain.output_parsers import PydanticOutputParser
 from pydantic import BaseModel, Field, validator
 
-# Load environment variables from .env file
-load_dotenv()
+# Access Groq API Key from Streamlit Secrets
+groq_api_key = st.secrets["groq_api_key"]
 
 # Define data model for Multiple Choice Questions using Pydantic
 class MCQQuestion(BaseModel):
